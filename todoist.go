@@ -3,9 +3,9 @@ package main
 import (
 	"bytes"
 	json2 "encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 )
 
 type Due struct {
@@ -14,7 +14,7 @@ type Due struct {
 	String    string `json:"string"`
 }
 
-type j_struct []struct {
+type j_struct struct {
 	ID           int64         `json:"id"`
 	ProjectID    int           `json:"project_id"`
 	Content      string        `json:"content"`
@@ -32,28 +32,73 @@ type j_struct []struct {
 	} `json:"due,omitempty"`
 }
 
-func getActiveTask() (j_struct, error) {
-	request, _ := http.NewRequest("GET", "https://beta.todoist.com/API/v8/tasks", nil)
+const todoistURL = "https://beta.todoist.com/"
+const taskURL = "API/v8/tasks"
 
-	auth_val := " Bearer " + getTodoistApiToken()
-	request.Header.Set("Authorization", auth_val)
+func getAuthHeader() (auth string) {
+	return " Bearer " + getTodoistApiToken()
+}
+
+func getActiveTasks() (tasks []j_struct, err error) {
+
+	base, err := url.Parse(todoistURL)
+	if err != nil {
+		return nil, err
+	}
+
+	api, err := url.Parse(taskURL)
+	if err != nil {
+		return nil, err
+	}
+
+	url := base.ResolveReference(api).String()
+
+	request, _ := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	auth := getAuthHeader()
+	request.Header.Set("Authorization", auth)
 
 	client1 := &http.Client{}
-	response, _ := client1.Do(request)
-
-	return_json, _ := ioutil.ReadAll(response.Body)
-
-	buff := bytes.NewBuffer(return_json)
-
-	json_str := buff.String()
-	json_byte := ([]byte)(json_str)
-
+	response, err := client1.Do(request)
+	if err != nil {
+		return nil, err
+	}
 	defer response.Body.Close()
 
-	var jj j_struct
-
-	if err := json2.Unmarshal(json_byte, &jj); err != nil {
-		fmt.Println(err)
+	return_json, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return nil, err
 	}
-	return jj, nil
+
+	buff := bytes.NewBuffer(return_json).String()
+	json_byte := ([]byte)(buff)
+
+	if err := json2.Unmarshal(json_byte, &tasks); err != nil {
+		return nil, err
+	}
+	return tasks, nil
+}
+
+func getContent() ([]string, error) {
+	j, err := getActiveTasks()
+	if err != nil {
+		return nil, err
+	}
+
+	tasks := []string{}
+	for index := 0; index < len(j); index++ {
+		tasks = append(tasks, j[index].Content)
+	}
+	return tasks, nil
+}
+
+func convArrToStr(arr []string) string {
+	tasks := ""
+	for index := 0; index < len(arr); index++ {
+		tasks += "・" + arr[index] + "\n"
+	}
+	return tasks
 }

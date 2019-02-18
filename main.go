@@ -2,18 +2,18 @@ package main
 
 import (
 	"bytes"
+	"log"
 	"net/http"
 )
 
 func main() {
-	jj, _ := getActiveTask()
-	content_arr := []string{}
-	content_str := ""
-	for index := 0; index < len(jj); index++ {
 
-		content_arr = append(content_arr, jj[index].Content)
-		content_str += " * " + jj[index].Content + "\n"
+	tasks, err := getContent()
+	if err != nil {
+		log.Fatalln(err)
 	}
+
+	content_str := convArrToStr(tasks)
 
 	content_header := `\n *remaining tasks* \n`
 	content_footer := `\n footer \n`
